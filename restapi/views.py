@@ -20,9 +20,13 @@ from restapi.models import *
 from restapi.serializers import *
 from restapi.custom_exception import *
 
+import logging
+logging.basicConfig(filename='test.log', level=logging.INFO,
+format='%(asctime)s:%(levelname)s:%(message)s')
 
 
 def index(_request):
+    ''' returns hello worls http response '''
     return HttpResponse("Hello, world. You're at Rest.")
 
 
@@ -34,7 +38,9 @@ def logout(request):
 
 @api_view(['GET'])
 def balance(request):
+    '''  this function tells the net balance associated with a user  '''
     user = request.user
+    logging.info("user in balance is ",user)
     expenses = Expenses.objects.filter(users__in=user.expenses.all())
     final_balance = {}
     for expense in expenses:
@@ -47,12 +53,13 @@ def balance(request):
             if to_user == user.id:
                 final_balance[from_user] = final_balance.get(from_user, 0) + eb['amount']
     final_balance = {k: v for k, v in final_balance.items() if v != 0}
-
+    logging.info("final_balance is ",final_balance)
     response = [{"user": k, "amount": int(v)} for k, v in final_balance.items()]
     return Response(response, status=200)
 
 
 def normalize(expense):
+    '''normalises the expenses'''
     user_balances = expense.users.all()
     dues = {}
     for user_balance in user_balances:
@@ -60,6 +67,7 @@ def normalize(expense):
                                   - user_balance.amount_owed
     dues = [(k, v) for k, v in sorted(dues.items(), key=lambda item: item[1])]
     start = 0
+    logging.info("dues ,",dues)
     end = len(dues) - 1
     balances = []
     while start < end:
