@@ -7,6 +7,7 @@ import urllib.request
 from datetime import datetime
 
 from django.http import HttpResponse
+from http import HTTPStatus
 from django.contrib.auth.models import User
 
 # Create your views here.
@@ -101,6 +102,7 @@ class group_view_set(ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
+        logging.info("users,",users)
         groups = user.members.all()
         if self.request.query_params.get('q', None) is not None:
             groups = groups.filter(name__icontains=self.request.query_params.get('q', None))
@@ -111,9 +113,10 @@ class group_view_set(ModelViewSet):
         data = self.request.data
         group = Groups(**data)
         group.save()
+        logging.info("group,",group)
         group.members.add(user)
         serializer = self.get_serializer(group)
-        return Response(serializer.data, status=201)
+        return Response(serializer.data, status=HTTPStatus.CREATED)
 
     @action(methods=['put'], detail=True)
     def members(self, request, pk=None):
@@ -121,6 +124,7 @@ class group_view_set(ModelViewSet):
         if group not in self.get_queryset():
             raise UnauthorizedUserException()
         body = request.data
+        logging.info("body = ",body)
         if body.get('add', None) is not None and body['add'].get('user_ids', None) is not None:
             added_ids = body['add']['user_ids']
             for user_id in added_ids:
@@ -130,7 +134,9 @@ class group_view_set(ModelViewSet):
             for user_id in removed_ids:
                 group.members.remove(user_id)
         group.save()
-        return Response(status=204)
+        logging.info("Group saved as",group)
+        return Response(status=HTTPStatus.NO_CONTENT)
+
 
     @action(methods=['get'], detail=True)
     def expenses(self, _request, pk=None):
@@ -138,6 +144,7 @@ class group_view_set(ModelViewSet):
         if group not in self.get_queryset():
             raise UnauthorizedUserException()
         expenses = group.expenses_set
+        logging.info("expenses",expenses)
         serializer = ExpensesSerializer(expenses, many=True)
         return Response(serializer.data, status=200)
 
@@ -147,29 +154,8 @@ class group_view_set(ModelViewSet):
         if group not in self.get_queryset():
             raise UnauthorizedUserException()
         expenses = Expenses.objects.filter(group=group)
-        dues = {}
-        for expense in expenses:
-            user_balances = UserExpense.objects.filter(expense=expense)
-            for user_balance in user_balances:
-                dues[user_balance.user] = dues.get(user_balance.user, 0) + user_balance.amount_lent \
-                                          - user_balance.amount_owed
-        dues = [(k, v) for k, v in sorted(dues.items(), key=lambda item: item[1])]
-        start = 0
-        end = len(dues) - 1
-        balances = []
-        while start < end:
-            amount = min(abs(dues[start][1]), abs(dues[end][1]))
-            amount = Decimal(amount).quantize(Decimal(10)**-2)
-            user_balance = {"from_user": dues[start][0].id, "to_user": dues[end][0].id, "amount": str(amount)}
-            balances.append(user_balance)
-            dues[start] = (dues[start][0], dues[start][1] + amount)
-            dues[end] = (dues[end][0], dues[end][1] - amount)
-            if dues[start][1] == 0:
-                start += 1
-            else:
-                end -= 1
-
-        return Response(balances, status=200)
+        
+        return normalize(expenses)
 
 
 class expenses_view_set(ModelViewSet):
@@ -178,6 +164,7 @@ class expenses_view_set(ModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
+        logging.info("user",user)
         if self.request.query_params.get('q', None) is not None:
             expenses = Expenses.objects.filter(users__in=user.expenses.all())\
                 .filter(description__icontains=self.request.query_params.get('q', None))
@@ -258,7 +245,7 @@ def transform(logs):
 
         result.append([key, text])
         print(key)
-
+        logging.info("key and text are",key,text)
     return result
 
 
@@ -277,4 +264,5 @@ def multiThreadedReader(urls, num_threads):
         data = data.decode('utf-8')
         result.extend(data.split("\n"))
     result = sorted(result, key=lambda elem:elem[1])
+    logging.info("result,",result)
     return result
