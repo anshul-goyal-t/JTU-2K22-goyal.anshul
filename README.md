@@ -8,5 +8,7 @@ If you don't know anyhting about django-rest-framework don't worry. You don't ha
 
 # Setup- 
 clone the repo and cd to the location
+
 Then build and run the docker container 
+
 It will also install the requirements present in requirements.txt
