@@ -101,6 +101,7 @@ class group_view_set(ModelViewSet):
     serializer_class = GroupSerializer
 
     def get_queryset(self):
+        '''get group with some query'''
         user = self.request.user
         logging.info("users,",users)
         groups = user.members.all()
@@ -109,12 +110,14 @@ class group_view_set(ModelViewSet):
         return groups
 
     def create(self, request, *args, **kwargs):
+        ''' creates a member'''
         user = self.request.user
         data = self.request.data
         group = Groups(**data)
         group.save()
         logging.info("group,",group)
         group.members.add(user)
+        logging.info("Member added in group")
         serializer = self.get_serializer(group)
         return Response(serializer.data, status=HTTPStatus.CREATED)
 
@@ -140,6 +143,7 @@ class group_view_set(ModelViewSet):
 
     @action(methods=['get'], detail=True)
     def expenses(self, _request, pk=None):
+        ''' serialises expenses'''
         group = Groups.objects.get(id=pk)
         if group not in self.get_queryset():
             raise UnauthorizedUserException()
@@ -150,6 +154,7 @@ class group_view_set(ModelViewSet):
 
     @action(methods=['get'], detail=True)
     def balances(self, _request, pk=None):
+        '''gets normalised expenses'''
         group = Groups.objects.get(id=pk)
         if group not in self.get_queryset():
             raise UnauthorizedUserException()
@@ -189,10 +194,12 @@ def logProcessor(request):
     sorted_logs = sort_by_time_stamp(logs)
     cleaned = transform(sorted_logs)
     data = aggregate(cleaned)
+    logging.info("data",data)
     response = response_format(data)
     return Response({"response":response}, status=status.HTTP_200_OK)
 
 def sort_by_time_stamp(logs):
+    ''' sorts by time stamp'''
     data = []
     for log in logs:
         data.append(log.split(" "))
@@ -202,6 +209,7 @@ def sort_by_time_stamp(logs):
 
 def response_format(raw_data):
     response = []
+    ''' converts raw data to formated data'''
     for timestamp, data in raw_data.items():
         entry = {'timestamp': timestamp}
         logs = []
@@ -214,6 +222,7 @@ def response_format(raw_data):
 
 def aggregate(cleaned_logs):
     data = {}
+    '''aggregates data'''
     for log in cleaned_logs:
         [key, text] = log
         value = data.get(key, {})
@@ -223,6 +232,7 @@ def aggregate(cleaned_logs):
 
 
 def transform(logs):
+    '''transforms log in better format'''
     result = []
     for log in logs:
         [_, timestamp, text] = log
